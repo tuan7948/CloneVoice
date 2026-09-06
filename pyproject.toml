@@ -138,6 +138,9 @@ gpu = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 
+[tool.vercel]
+entrypoint = "apps.web_stream:app"
+
 [project.scripts]
 vieneu-web = "apps.gradio_main:main"
 vieneu-stream = "apps.web_stream:main"

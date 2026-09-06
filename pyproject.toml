@@ -69,6 +69,8 @@ requires-python = ">=3.10"
 # The Gradio demo is intentionally optional so serverless deployments do not
 # bundle its large UI dependency tree.
 dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
     "sea-g2p>=0.9.0", # phonemizer (Rust, torch-free) — cần hàm punc_norm() (>=0.7.11)
     "onnxruntime>=1.20.0", # runs the v3 transformers + MOSS codec
     "numpy",

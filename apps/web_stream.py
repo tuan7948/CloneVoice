@@ -19,7 +19,6 @@ from pathlib import Path
 from threading import Lock
 from typing import Optional
 
-import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from pydantic import BaseModel
@@ -84,7 +83,9 @@ async def voices():
         return [{"id": "", "name": f"⚠️ {e}"}]
 
 
-def _pcm16(audio_f32: np.ndarray) -> bytes:
+def _pcm16(audio_f32) -> bytes:
+    import numpy as np
+
     return (np.asarray(audio_f32) * 32767).clip(-32768, 32767).astype(np.int16).tobytes()
 
 

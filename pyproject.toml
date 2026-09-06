@@ -65,8 +65,9 @@ authors = [
 requires-python = ">=3.10"
 # Minimal, TORCH-FREE core. `pip install vieneu` runs VieNeu-TTS v3 Turbo on CPU
 # via ONNX Runtime. GPU is a manual step (install a CUDA torch + transformers
-# yourself — there is no [gpu] extra; see [project.optional-dependencies] below);
-# legacy backends (llama-cpp, lmdeploy, librosa, neucodec) live in the [legacy] extra.
+# yourself — there is no [gpu] extra; see [project.optional-dependencies] below).
+# The Gradio demo is intentionally optional so serverless deployments do not
+# bundle its large UI dependency tree.
 dependencies = [
     "sea-g2p>=0.9.0", # phonemizer (Rust, torch-free) — cần hàm punc_norm() (>=0.7.11)
     "onnxruntime>=1.20.0", # runs the v3 transformers + MOSS codec
@@ -76,9 +77,7 @@ dependencies = [
     "kaldi-native-fbank>=1.20", # speaker-encoder fbank front-end (torch-free voice cloning)
     "tokenizers>=0.20", # phoneme tokenizer (torch-free)
     "huggingface_hub", # fetch ONNX / config / tokenizer / voices
-    "PyYAML", # gradio config.yaml
-    "gradio>=5.49.1", # web UI (vieneu-web)
-    "librosa>=0.11.0",
+    "PyYAML", # config.yaml
     "perth>=0.2.0", # optional audio watermark (skipped gracefully if absent)
 ]
 
@@ -91,6 +90,10 @@ dependencies = [
 "Changelog" = "https://github.com/pnnbao97/VieNeu-TTS/releases"
 
 [project.optional-dependencies]
+web = [
+    "gradio>=5.49.1",
+    "librosa>=0.11.0",
+]
 legacy = [
     "torch",
     "torchaudio",

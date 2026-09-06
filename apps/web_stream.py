@@ -12,37 +12,46 @@ Public API dùng ở đây:
     for chunk in vieneu.infer_stream(text, voice="Minh Đức"):
         ...                                         # np.float32 @ 48kHz, phát/ghi dần
 """
-import time
 import io
+import time
 import wave
 from pathlib import Path
+from threading import Lock
 from typing import Optional
 
 import numpy as np
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from pydantic import BaseModel
 import uvicorn
 
-from vieneu import Vieneu
-
 SAMPLE_RATE = 48_000
 app = FastAPI()
 vieneu = None
+_model_error: Optional[str] = None
+_model_lock = Lock()
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 CLIENT_HTML_PATH = ROOT_DIR / "client" / "client.html"
 
 
 def load_model():
-    global vieneu
-    print("⏳ Loading VieNeu-TTS v3 Turbo (int8, CPU)...")
-    # backend="onnx" ép đường ONNX/CPU int8. KHÔNG để device="auto" (mặc định):
-    vieneu = Vieneu(backend="onnx")  # == Vieneu(mode="v3turbo", backend="onnx", precision="int8")
-    print(f"✅ Ready. Backbone: int8 | intra_op threads: {getattr(vieneu.engine, 'ort_intra_op_threads', '?')}")
-
-
-load_model()
+    global vieneu, _model_error
+    if vieneu is not None:
+        return vieneu
+    with _model_lock:
+        if vieneu is not None:
+            return vieneu
+        try:
+            print("[v0] Loading VieNeu-TTS v3 Turbo (int8, CPU)...")
+            from vieneu import Vieneu
+            vieneu = Vieneu(backend="onnx")
+            print("[v0] VieNeu-TTS model ready")
+            return vieneu
+        except Exception as exc:
+            _model_error = str(exc)
+            print(f"[v0] VieNeu-TTS model failed to load: {_model_error}")
+            raise HTTPException(status_code=503, detail="TTS model is unavailable") from exc
 
 
 @app.get("/")
@@ -61,7 +70,8 @@ async def favicon():
 @app.get("/voices")
 async def voices():
     try:
-        vs = vieneu.list_preset_voices()
+        engine = load_model()
+        vs = engine.list_preset_voices()
         out = []
         for item in vs:
             if isinstance(item, (tuple, list)) and len(item) == 2:
@@ -80,7 +90,9 @@ def _pcm16(audio_f32: np.ndarray) -> bytes:
 
 @app.get("/stream")
 async def stream(text: str, voice_id: Optional[str] = None):
-    """Stream 48 kHz WAV: header (nframes rất lớn để phát liên tục) rồi PCM16 theo chunk."""
+    """Stream 48 kHz WAV: header rồi PCM16 theo từng chunk."""
+    engine = load_model()
+
     def gen():
         # WAV header 48 kHz mono; nframes huge → browser phát liền khi data tới.
         h = io.BytesIO()
@@ -93,7 +105,7 @@ async def stream(text: str, voice_id: Optional[str] = None):
         first_at = None
         n_chunks = 0
         emitted = 0
-        for chunk in vieneu.infer_stream(text, voice=voice_id or None):
+        for chunk in engine.infer_stream(text, voice=voice_id or None):
             if chunk is None or len(chunk) == 0:
                 continue
             if first_at is None:

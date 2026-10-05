@@ -13,6 +13,7 @@ Public API dùng ở đây:
         ...                                         # np.float32 @ 48kHz, phát/ghi dần
 """
 import io
+import json
 import time
 import wave
 from pathlib import Path
@@ -32,6 +33,17 @@ _model_lock = Lock()
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 CLIENT_HTML_PATH = ROOT_DIR / "client" / "client.html"
+VOICES_PATH = ROOT_DIR / "src" / "vieneu" / "assets" / "voices_v3_turbo.json"
+
+
+def fallback_voices():
+    try:
+        data = json.loads(VOICES_PATH.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            data = data.get("voices", [])
+        return [{"id": str(item.get("id", item.get("name", ""))), "name": str(item.get("name", item.get("id", "")))} for item in data if isinstance(item, dict)]
+    except (OSError, json.JSONDecodeError, TypeError):
+        return [{"id": "Minh Đức", "name": "Minh Đức"}]
 
 
 def load_model():
@@ -68,9 +80,12 @@ async def favicon():
 
 @app.get("/voices")
 async def voices():
+    # Voice discovery must not make the entire UI unusable when a serverless
+    # runtime cannot download/load the model during a cold start.
+    if vieneu is None:
+        return fallback_voices()
     try:
-        engine = load_model()
-        vs = engine.list_preset_voices()
+        vs = vieneu.list_preset_voices()
         out = []
         for item in vs:
             if isinstance(item, (tuple, list)) and len(item) == 2:
@@ -78,9 +93,14 @@ async def voices():
                 out.append({"id": vid, "name": label})
             else:
                 out.append({"id": str(item), "name": str(item)})
-        return out or [{"id": "", "name": "(no preset voices)"}]
-    except Exception as e:  # noqa: BLE001
-        return [{"id": "", "name": f"⚠️ {e}"}]
+        return out or fallback_voices()
+    except Exception:
+        return fallback_voices()
+
+
+@app.get("/health")
+async def health():
+    return {"ok": True, "model_loaded": vieneu is not None, "model_error": _model_error}
 
 
 def _pcm16(audio_f32) -> bytes:

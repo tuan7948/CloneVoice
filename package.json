@@ -1,0 +1,9 @@
+{
+  "name": "clonevoice",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CloneVoice Vietnamese text-to-speech studio",
+  "scripts": {
+    "build": "echo 'CloneVoice uses the Python Vercel entrypoint'"
+  }
+}

@@ -37,13 +37,23 @@ VOICES_PATH = ROOT_DIR / "src" / "vieneu" / "assets" / "voices_v3_turbo.json"
 
 
 def fallback_voices():
+    """Return the curated preset names without loading the TTS model."""
     try:
         data = json.loads(VOICES_PATH.read_text(encoding="utf-8"))
         if isinstance(data, dict):
-            data = data.get("voices", [])
-        return [{"id": str(item.get("id", item.get("name", ""))), "name": str(item.get("name", item.get("id", "")))} for item in data if isinstance(item, dict)]
+            presets = data.get("presets", data.get("voices", []))
+            if isinstance(presets, dict):
+                return [{"id": str(name), "name": str(name)} for name in presets]
+            data = presets
+        if isinstance(data, list):
+            return [
+                {"id": str(item.get("id", item.get("name", ""))), "name": str(item.get("name", item.get("id", "")))}
+                for item in data
+                if isinstance(item, dict) and (item.get("id") or item.get("name"))
+            ]
     except (OSError, json.JSONDecodeError, TypeError):
-        return [{"id": "Minh Đức", "name": "Minh Đức"}]
+        pass
+    return [{"id": "Minh Đức", "name": "Minh Đức"}]
 
 
 def load_model():

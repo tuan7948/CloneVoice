@@ -4,6 +4,7 @@
   "private": true,
   "description": "CloneVoice Vietnamese text-to-speech studio",
   "scripts": {
+    "dev": "python -m uvicorn apps.web_stream:app --host 0.0.0.0 --port 3000",
     "build": "echo 'CloneVoice uses the Python Vercel entrypoint'"
   }
 }

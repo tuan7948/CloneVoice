@@ -37,13 +37,23 @@ VOICES_PATH = ROOT_DIR / "src" / "vieneu" / "assets" / "voices_v3_turbo.json"
 
 
 def fallback_voices():
+    """Return the curated preset names without loading the TTS model."""
     try:
         data = json.loads(VOICES_PATH.read_text(encoding="utf-8"))
         if isinstance(data, dict):
-            data = data.get("voices", [])
-        return [{"id": str(item.get("id", item.get("name", ""))), "name": str(item.get("name", item.get("id", "")))} for item in data if isinstance(item, dict)]
+            presets = data.get("presets", data.get("voices", []))
+            if isinstance(presets, dict):
+                return [{"id": str(name), "name": str(name)} for name in presets]
+            data = presets
+        if isinstance(data, list):
+            return [
+                {"id": str(item.get("id", item.get("name", ""))), "name": str(item.get("name", item.get("id", "")))}
+                for item in data
+                if isinstance(item, dict) and (item.get("id") or item.get("name"))
+            ]
     except (OSError, json.JSONDecodeError, TypeError):
-        return [{"id": "Minh Đức", "name": "Minh Đức"}]
+        pass
+    return [{"id": "Minh Đức", "name": "Minh Đức"}]
 
 
 def load_model():
@@ -80,22 +90,29 @@ async def favicon():
 
 @app.get("/voices")
 async def voices():
-    # Voice discovery must not make the entire UI unusable when a serverless
-    # runtime cannot download/load the model during a cold start.
+    # Read the bundled preset catalog first. This keeps the dropdown populated
+    # even when model voice discovery is unavailable or returns an empty value.
+    catalog = fallback_voices()
     if vieneu is None:
-        return fallback_voices()
+        return catalog
     try:
-        vs = vieneu.list_preset_voices()
+        discovered = vieneu.list_preset_voices() or []
         out = []
-        for item in vs:
+        for item in discovered:
             if isinstance(item, (tuple, list)) and len(item) == 2:
                 label, vid = item
-                out.append({"id": vid, "name": label})
+                voice_id, name = str(vid), str(label)
+            elif isinstance(item, dict):
+                voice_id = str(item.get("id") or item.get("name") or "")
+                name = str(item.get("name") or item.get("id") or "")
             else:
-                out.append({"id": str(item), "name": str(item)})
-        return out or fallback_voices()
-    except Exception:
-        return fallback_voices()
+                voice_id = name = str(item)
+            if voice_id and name:
+                out.append({"id": voice_id, "name": name})
+        return out or catalog
+    except Exception as exc:
+        print(f"[v0] Voice discovery unavailable, using bundled catalog: {exc}")
+        return catalog
 
 
 @app.get("/health")
